@@ -170,6 +170,10 @@ export const skillHelp = {
 	description: "Install, search, publish, and manage skills on the Skillshare registry (skills.omp.sh)",
 } satisfies CommandMetadata;
 
+export const specHelp = {
+	description: "Create a version-controlled spec-driven development draft in .vlad/specs",
+} satisfies CommandMetadata;
+
 export const sshHelp = { description: "Manage SSH host configurations" } satisfies CommandMetadata;
 
 export const statsHelp = { description: "View usage statistics" } satisfies CommandMetadata;

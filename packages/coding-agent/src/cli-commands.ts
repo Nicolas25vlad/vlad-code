@@ -260,6 +260,11 @@ export const commands: CommandEntry[] = [
 		help: commandHelp.skillHelp,
 	},
 	{
+		name: "spec",
+		load: () => import("./commands/spec").then(m => m.default),
+		help: commandHelp.specHelp,
+	},
+	{
 		name: "ssh",
 		load: () => import("./commands/ssh").then(m => m.default),
 		help: commandHelp.sshHelp,

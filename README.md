@@ -1,43 +1,37 @@
-> [!IMPORTANT]
-> Vlad Code is a public fork of [Oh My Pi](https://github.com/can1357/oh-my-pi), preserving its upstream history and license. The inherited OMP runtime is the working foundation; Vlad-specific memory, learning, and engineering workflows are not implemented yet. See [`UPSTREAM_VERSION`](UPSTREAM_VERSION) for the last integrated OMP release. Upstream releases are monitored by [GitHub Actions](.github/workflows/upstream-release-monitor.yml); monitoring does not merge or integrate releases automatically.
+# Vlad Code
 
-<p align="center">
-  <img src="https://github.com/can1357/oh-my-pi/blob/main/assets/hero.png?raw=true" alt="omp">
-</p>
+> The AI writes. You remain the engineer.
 
-<p align="center">
-  <strong>A coding agent with the IDE wired in.</strong>
-  <strong><a href="https://omp.sh">omp.sh</a></strong>
-</p>
+[![CI](https://github.com/Nicolas25vlad/vlad-code/actions/workflows/ci.yml/badge.svg)](https://github.com/Nicolas25vlad/vlad-code/actions/workflows/ci.yml) [![License](https://img.shields.io/github/license/Nicolas25vlad/vlad-code)](LICENSE)
 
-<p align="center">
-  Language: <strong>English</strong> | <a href="README.zh-CN.md">简体中文</a>
-</p>
+Vlad Code is a public fork of [Oh My Pi](https://github.com/can1357/oh-my-pi). It keeps OMP's coding-agent runtime and adds Vlad-owned engineering workflows over time. The current application is still the inherited `omp` CLI; **there is no `vlad` executable or Vlad-specific installer yet.**
 
-<p align="center">
-  <a href="https://www.npmjs.com/package/@oh-my-pi/pi-coding-agent"><img src="https://img.shields.io/npm/v/@oh-my-pi/pi-coding-agent?style=flat&colorA=222222&colorB=CB3837" alt="npm version"></a>
-  <a href="https://github.com/can1357/oh-my-pi/blob/main/packages/coding-agent/CHANGELOG.md"><img src="https://img.shields.io/badge/changelog-keep-E05735?style=flat&colorA=222222" alt="Changelog"></a>
-  <a href="https://github.com/can1357/oh-my-pi/actions"><img src="https://img.shields.io/github/actions/workflow/status/can1357/oh-my-pi/ci.yml?style=flat&colorA=222222&colorB=3FB950" alt="CI"></a>
-  <a href="https://github.com/can1357/oh-my-pi/blob/main/LICENSE"><img src="https://img.shields.io/github/license/can1357/oh-my-pi?style=flat&colorA=222222&colorB=58A6FF" alt="License"></a>
-  <a href="https://www.typescriptlang.org"><img src="https://img.shields.io/badge/TypeScript-3178C6?style=flat&colorA=222222&logo=typescript&logoColor=white" alt="TypeScript"></a>
-  <a href="https://www.rust-lang.org"><img src="https://img.shields.io/badge/Rust-DEA584?style=flat&colorA=222222&logo=rust&logoColor=white" alt="Rust"></a>
-  <a href="https://bun.sh"><img src="https://img.shields.io/badge/runtime-Bun-f472b6?style=flat&colorA=222222" alt="Bun"></a>
-  <a href="https://discord.gg/4NMW9cdXZa"><img src="https://img.shields.io/badge/Discord-5865F2?style=flat&colorA=222222&logo=discord&logoColor=white" alt="Discord"></a>
-</p>
+## What works today
 
-<p align="center">
-  Built by <a href="https://stencil.so">Stencil Labs</a> · Fork of <a href="https://github.com/badlogic/pi-mono">Pi</a> by <a href="https://github.com/mariozechner">@mariozechner</a>
-</p>
+- **Inherited and usable:** OMP's multi-provider coding agent, tools, sessions, subagents, CLI/TUI, MCP, native components, and Tern Surface Protocol support.
+- **Vlad-specific foundation:** public fork, pinned integrated-release tracking, scheduled/manual upstream release monitoring, protected `main`, and `omp spec new` specification scaffolding.
+- **Not implemented:** managed Hindsight memory, Hermes-style learning, Vlad Prompts installation, `/ship`, backlog workers, and Vlad-specific dashboards. These are roadmap items, not available features.
 
-The most capable agent surface that ships. Continuously tuned by real-world use — complete out of the box, open all the way down.
+## Run from source
 
-**60+** providers · **31** built-in tools · **14** lsp ops · **28** dap ops · **~80k** lines of Rust core.
+Requires Bun 1.4.4 or newer and the inherited Rust/Bazel toolchain for native development.
 
-> [!NOTE]
-> Pull requests are **temporarily open to everyone** as a trial. We previously
-> required a vouch before accepting PRs; that requirement is lifted for now
-> while we evaluate how open contributions go. Depending on the results, the
-> vouch system may return.
+```sh
+bun install
+bun run dev
+```
+
+The running CLI is currently named `omp`. See [development instructions](docs/development/README.md), [architecture](docs/architecture/README.md), [integration assessment](docs/integrations/README.md), and [roadmap](docs/roadmap/README.md).
+
+## Upstream relationship
+
+`UPSTREAM_VERSION` records the last integrated OMP release. The [release monitor](.github/workflows/upstream-release-monitor.yml) checks every six hours and supports manual runs; it opens a tracking issue but never merges or advances the baseline. Upstream integration remains a reviewed change.
+
+This fork preserves the upstream [MIT license](LICENSE) and notices. See [third-party notices](THIRD_PARTY_NOTICES.md) and the [foundation ADR](docs/decisions/0001-oh-my-pi-foundation.md).
+
+## Inherited Oh My Pi documentation
+
+The installation guide and feature descriptions below are retained from OMP. They document the **upstream `omp` runtime**, not additional Vlad Code features or a Vlad installer.
 
 ## Install
 
