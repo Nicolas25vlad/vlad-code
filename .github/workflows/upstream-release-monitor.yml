@@ -1,0 +1,94 @@
+name: Upstream release monitor
+
+on:
+  schedule:
+    - cron: "0 */6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: upstream-release-monitor
+  cancel-in-progress: false
+
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: Find releases newer than the integrated baseline
+        id: release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          baseline="$(tr -d '\r\n' < UPSTREAM_VERSION)"
+          gh api --paginate --slurp repos/can1357/oh-my-pi/releases > "$RUNNER_TEMP/releases.json"
+          jq -e --arg baseline "$baseline" '
+            add as $releases
+            | if any($releases[]; .tag_name == $baseline) then
+                ($releases | map(select(.tag_name == $baseline)) | first | .published_at) as $integrated_at
+                | $releases
+                | map(select(.published_at > $integrated_at))
+                | sort_by(.published_at)
+                | (last // {available: false})
+              else
+                error("Integrated tag is missing from upstream releases: " + $baseline)
+              end
+          ' "$RUNNER_TEMP/releases.json" > "$RUNNER_TEMP/release.json"
+          if jq -e '.available == false' "$RUNNER_TEMP/release.json" >/dev/null; then
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          jq -r '"tag=" + .tag_name, "url=" + .html_url, "title=" + ((.name // .tag_name) | gsub("[\\r\\n]"; " ")), "compatibility=" + ([.body // "" | test("breaking change|breaking changes|migration|deprecated|deprecat|removed|incompatib"; "i")] | any | tostring)' "$RUNNER_TEMP/release.json" >> "$GITHUB_OUTPUT"
+          echo "available=true" >> "$GITHUB_OUTPUT"
+
+      - name: Open one issue for the newer release
+        if: steps.release.outputs.available == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.release.outputs.tag }}
+          RELEASE_URL: ${{ steps.release.outputs.url }}
+          RELEASE_TITLE: ${{ steps.release.outputs.title }}
+          COMPATIBILITY: ${{ steps.release.outputs.compatibility }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          title="Upstream OMP release: ${TAG}"
+          if gh issue list --state all --limit 1000 --json title | jq --arg title "$title" 'any(.[]; .title == $title)' | grep -qx true; then
+            echo "A tracking issue already exists for ${TAG}."
+            exit 0
+          fi
+
+          ensure_label() {
+            local name="$1" color="$2" description="$3"
+            if ! gh label list --json name | jq -e --arg name "$name" 'any(.[]; .name == $name)' >/dev/null; then
+              gh label create "$name" --color "$color" --description "$description"
+            fi
+          }
+          ensure_label upstream 1D76DB "Oh My Pi upstream tracking"
+          ensure_label update FBCA04 "Upstream or dependency update"
+          ensure_label automated 7057FF "Created by repository automation"
+          labels=(upstream update automated)
+          if [ "$COMPATIBILITY" = true ]; then
+            ensure_label compatibility D93F0B "Potential compatibility impact"
+            labels+=(compatibility)
+          fi
+
+          jq -r --arg tag "$TAG" 'first(.[][] | select(.tag_name == $tag) | ((.body // "No release notes were published.")[0:12000]))' "$RUNNER_TEMP/releases.json" > "$RUNNER_TEMP/release-notes.md"
+          {
+            printf '## Upstream release available\n\n'
+            printf -- '- **Integrated baseline:** `%s` (`UPSTREAM_VERSION`)\n' "$(tr -d '\r\n' < UPSTREAM_VERSION)"
+            printf -- '- **Available release:** [`%s`](%s)\n' "$TAG" "$RELEASE_URL"
+            printf -- '- **Release title:** %s\n' "$RELEASE_TITLE"
+            if [ "$COMPATIBILITY" = true ]; then
+              printf '\n> Release notes mention possible compatibility-sensitive changes. Review the upstream notes and compatibility before integrating.\n'
+            fi
+            printf '\n## Upstream changelog\n\n'
+            cat "$RUNNER_TEMP/release-notes.md"
+            printf '\n\n## Integration checklist\n\n- [ ] Review upstream changes and compatibility\n- [ ] Integrate through a reviewed pull request\n- [ ] Update `UPSTREAM_VERSION` only after successful integration\n'
+          } > "$RUNNER_TEMP/issue.md"
+          gh issue create --title "$title" --body-file "$RUNNER_TEMP/issue.md" --label "$(IFS=,; echo "${labels[*]}")"

@@ -1,3 +1,6 @@
+> [!IMPORTANT]
+> Vlad Code is a public fork of [Oh My Pi](https://github.com/can1357/oh-my-pi), preserving its upstream history and license. The inherited OMP runtime is the working foundation; Vlad-specific memory, learning, and engineering workflows are not implemented yet. See [`UPSTREAM_VERSION`](UPSTREAM_VERSION) for the last integrated OMP release. Upstream releases are monitored by [GitHub Actions](.github/workflows/upstream-release-monitor.yml); monitoring does not merge or integrate releases automatically.
+
 <p align="center">
   <img src="https://github.com/can1357/oh-my-pi/blob/main/assets/hero.png?raw=true" alt="omp">
 </p>
