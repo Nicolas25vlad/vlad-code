@@ -18,7 +18,11 @@ export default class Spec extends Command {
 
 	async run(): Promise<void> {
 		const { args, flags } = await this.parse(Spec);
-		const filePath = await createSpecFile(process.cwd(), args.slug, flags.title);
+		const slug = args.slug;
+		if (slug === undefined) {
+			throw new Error("A specification slug is required");
+		}
+		const filePath = await createSpecFile(process.cwd(), slug, flags.title);
 		process.stdout.write(`Created ${filePath}\n`);
 	}
 }
