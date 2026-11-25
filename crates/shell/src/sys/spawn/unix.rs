@@ -1561,13 +1561,24 @@ fn reap(pid: i32) -> libc::rusage {
 /// The usage `wait4` reported for a reaped child, plus on macOS what its
 /// zombie still told [`proc_pid_rusage`](libc::proc_pid_rusage) (`apple`):
 /// instructions, cycles and the peak memory footprint.
-fn proc_usage(ru: &libc::rusage, apple: Option<&libc::rusage_info_v4>) -> ProcUsage {
+fn proc_usage(
+	ru: &libc::rusage,
+	#[cfg(target_os = "macos")] apple: Option<&libc::rusage_info_v4>,
+) -> ProcUsage {
 	let ns = |tv: libc::timeval| {
 		(tv.tv_sec.max(0) as u64) * 1_000_000_000 + (tv.tv_usec.max(0) as u64) * 1_000
 	};
 	let count = |n: libc::c_long| n.max(0) as u64;
 	// Linux and the BSDs count kilobytes; macOS bytes.
 	let rss_unit = if cfg!(target_os = "macos") { 1 } else { 1024 };
+	#[cfg(target_os = "macos")]
+	let (instructions, cycles, peak_footprint) = (
+		apple.map_or(0, |ri| ri.ri_instructions),
+		apple.map_or(0, |ri| ri.ri_cycles),
+		apple.map_or(0, |ri| ri.ri_lifetime_max_phys_footprint),
+	);
+	#[cfg(not(target_os = "macos"))]
+	let (instructions, cycles, peak_footprint) = (0, 0, 0);
 	ProcUsage {
 		user_ns: ns(ru.ru_utime),
 		sys_ns: ns(ru.ru_stime),
@@ -1582,9 +1593,9 @@ fn proc_usage(ru: &libc::rusage, apple: Option<&libc::rusage_info_v4>) -> ProcUs
 		signals: count(ru.ru_nsignals),
 		voluntary_switches: count(ru.ru_nvcsw),
 		involuntary_switches: count(ru.ru_nivcsw),
-		instructions: apple.map_or(0, |ri| ri.ri_instructions),
-		cycles: apple.map_or(0, |ri| ri.ri_cycles),
-		peak_footprint: apple.map_or(0, |ri| ri.ri_lifetime_max_phys_footprint),
+		instructions,
+		cycles,
+		peak_footprint,
 	}
 }
 
@@ -1723,11 +1734,13 @@ impl ExtProc for UnixProc {
 		}
 		#[cfg(target_os = "macos")]
 		let apple = apple_usage(self.pid);
-		#[cfg(not(target_os = "macos"))]
-		let apple = None;
 		let ru = self.shared.state.reap(self.pid);
 		self.reaped = true;
-		Some(proc_usage(&ru, apple.as_ref()))
+		#[cfg(target_os = "macos")]
+		let usage = proc_usage(&ru, apple.as_ref());
+		#[cfg(not(target_os = "macos"))]
+		let usage = proc_usage(&ru);
+		Some(usage)
 	}
 }
 
