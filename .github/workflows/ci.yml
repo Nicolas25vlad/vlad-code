@@ -285,17 +285,16 @@ jobs:
 
    # Provides the linux-x64 addon pair every downstream TS job installs.
    #
-   # PRs never build. They restore the pair main built for the same native
-   # sources from actions/cache (key = hash of every native build input:
-   # toolchain and build settings plus crates/** and BUILD.bazel). With no
-   # exact entry (the PR changes native inputs, or main has not built this
-   # state yet) they take main's newest entry, and with no entry at all the
-   # latest npm release. The workspace loader skips its version sentinel for
-   # workspace loads, so any of these load under a newer checkout. Testing
-   # against main's build instead of the last release keeps merged-but-
-   # unreleased native fixes from failing every PR that did not touch Rust
-   # (a merged grep fix plus its TS test failed 75 PR runs against the
-   # 18.3.1 addon). Only main saves; see the save step for why.
+   # Upstream PRs restore the linux-x64 addon pair from main's cache (key =
+   # hash of every native build input). With no exact entry they use main's
+   # newest entry; if no cache exists they use the latest npm release. Forks
+   # build from this checkout when no exact cache entry exists, avoiding an
+   # npm addon whose API may lag the checked-out TypeScript. The workspace
+   # loader skips its version sentinel for workspace loads.
+   #
+   # Main builds only the pair here so the TS fan-out starts as soon as it
+   # links; native_addons_cross builds every other target in parallel.
+   # Only upstream main saves the shared cache.
    #
    # Main (vmon, node Bazel cache) builds only the pair here so the TS
    # fan-out starts as soon as it links; native_addons_cross builds every
@@ -320,23 +319,42 @@ jobs:
            run: |
               echo "prefix=natives-linux-x64-v1-" >> "$GITHUB_OUTPUT"
               echo "key=natives-linux-x64-v1-$NATIVE_INPUTS_HASH" >> "$GITHUB_OUTPUT"
-
-         # ---- PR path: main-built addons from actions/cache, else npm ----
-         # `ci-natives` is a plain workspace-relative path on purpose: the
-         # cache version hashes the literal path list, so vmon (save) and
-         # hosted (restore) must spell it identically, and upload-artifact
-         # skips dot-directories by default.
-         - name: Restore main-built native addons
+         - name: Restore native addon cache
            id: natives-cache
-           if: github.event_name == 'pull_request' || github.repository != 'can1357/oh-my-pi'
+           if: github.event_name == 'pull_request'
            uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
            with:
               path: ci-natives
               key: ${{ steps.natives-key.outputs.key }}
               restore-keys: |
                  ${{ steps.natives-key.outputs.prefix }}
+
+         # ---- fork path: build native addons from this checkout ----
+         # An npm addon may lag the native API used by the checked-out TypeScript.
+         # Build source-matched artifacts in forks when no exact cache exists.
+         - id: fork-bazel-cache
+           if: github.repository != 'can1357/oh-my-pi' && steps.natives-cache.outputs.cache-hit != 'true'
+           uses: ./.github/actions/bazel-cache
+         - id: build-fork-native
+           name: Build fork native addons from checkout
+           if: github.repository != 'can1357/oh-my-pi' && steps.natives-cache.outputs.cache-hit != 'true'
+           shell: bash
+           env:
+              BAZELRC: ${{ steps.fork-bazel-cache.outputs.rc }}
+           run: |
+              set -eo pipefail
+              if [ "$(ulimit -Sn)" != unlimited ] && [ "$(ulimit -Sn)" -lt 65536 ]; then ulimit -Sn 65536 || true; fi
+              : > "$RUNNER_TEMP/bazel-build-fork.log"
+              for target in $NATIVES_X64_TARGETS; do
+                bazelisk --bazelrc="$BAZELRC" build "//:$target" 2>&1 | tee -a "$RUNNER_TEMP/bazel-build-fork.log"
+              done
+              for target in $NATIVES_X64_TARGETS; do
+                mkdir -p "ci-natives/$target"
+                cp -L bazel-bin/"$target"/*.node "ci-natives/$target/"
+              done
+         # The npm fallback is only for upstream PRs without any cache entry.
          - name: Fetch release native addons (npm)
-           if: (github.event_name == 'pull_request' || github.repository != 'can1357/oh-my-pi') && steps.natives-cache.outputs.cache-matched-key == ''
+           if: github.repository == 'can1357/oh-my-pi' && github.event_name == 'pull_request' && steps.natives-cache.outputs.cache-matched-key == ''
            shell: bash
            run: |
               set -euo pipefail
@@ -346,21 +364,23 @@ jobs:
               mkdir -p ci-natives/natives-linux-x64-baseline ci-natives/natives-linux-x64-modern
               cp "$RUNNER_TEMP/package/pi_natives.linux-x64-baseline.node" ci-natives/natives-linux-x64-baseline/
               cp "$RUNNER_TEMP/package/pi_natives.linux-x64-modern.node" ci-natives/natives-linux-x64-modern/
-         # Make the addon source visible whenever it is not source-matched,
-         # instead of leaving a reviewer to wonder which addons the tests ran.
+         # Make the addon source visible whenever it is not source-matched.
          - name: Report native addon source
            if: github.event_name == 'pull_request' || github.repository != 'can1357/oh-my-pi'
            shell: bash
            env:
               EXACT: ${{ steps.natives-cache.outputs.cache-hit }}
               MATCHED: ${{ steps.natives-cache.outputs.cache-matched-key }}
+              FORK_BUILD: ${{ steps.build-fork-native.outcome }}
            run: |
               if [ "$EXACT" = true ]; then
-                echo "Using main's addons for this exact native source state ($MATCHED)."
+                echo "Using cached addons for this exact native source state ($MATCHED)."
+              elif [ "$FORK_BUILD" = success ]; then
+                echo "Built native addons from this checkout with Bazel."
               elif [ -n "$MATCHED" ]; then
                 echo "::notice title=Native addons not source-matched::No main build matches this PR's native sources; testing against main's newest addon build ($MATCHED). Native changes are validated post-merge on main and at release."
               else
-                echo "::notice title=Native addons from npm::No main-built addon cache entry is available; testing against the latest npm release addons."
+                echo "::notice title=Native addons from npm::Testing against the latest npm release addons."
               fi
 
          # ---- main path: bazel build of the linux-x64 pair ----

@@ -13,7 +13,7 @@ export default class Spec extends Command {
 	};
 	static examples = [
 		"omp spec new managed-memory",
-		"omp spec new managed-memory --title \"Managed memory integration\"",
+		'omp spec new managed-memory --title "Managed memory integration"',
 	];
 
 	async run(): Promise<void> {

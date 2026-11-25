@@ -36,4 +36,3 @@ export async function createSpecFile(root: string, slug: string, title?: string)
 	await fs.writeFile(filePath, renderSpecTemplate(specTitle), { flag: "wx" });
 	return filePath;
 }
-
