@@ -16,9 +16,15 @@ it("creates a structured spec and rejects unsafe or replacing writes", async () 
 		expect(filePath).toBe(path.join(root, ".vlad", "specs", "managed-memory.md"));
 		expect(content.startsWith("# Managed Memory\n")).toBe(true);
 		expect(
-			["## Goal", "## Context", "## Scope", "## Constraints", "## Acceptance criteria", "## Interfaces", "## Verification"].every(
-				heading => content.includes(heading),
-			),
+			[
+				"## Goal",
+				"## Context",
+				"## Scope",
+				"## Constraints",
+				"## Acceptance criteria",
+				"## Interfaces",
+				"## Verification",
+			].every(heading => content.includes(heading)),
 		).toBe(true);
 		await expect(createSpecFile(root, "managed-memory", "Replacement")).rejects.toMatchObject({ code: "EEXIST" });
 		expect(await fs.readFile(filePath, "utf8")).toBe(content);
