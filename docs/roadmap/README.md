@@ -1,6 +1,6 @@
 # Roadmap status
 
-Vlad Code currently runs on the inherited Oh My Pi source fork. This is a foundation, not a completed implementation of the proposed product systems.
+Vlad Code is based on the inherited Oh My Pi source fork. Its coding-agent runtime and existing capabilities are available; Vlad-specific product systems are being built separately.
 
 ## M0 — Foundation
 
@@ -13,4 +13,4 @@ Vlad Code currently runs on the inherited Oh My Pi source fork. This is a founda
 
 ## Later milestones
 
-Memory, learning, Vlad Prompts installation, engineering governance, Vlad Ship, continuous agents, and Vlad-specific Tern visuals are not implemented. Do not describe them as available until their end-to-end behavior is verified.
+Vlad-owned memory service and learning policies, Vlad Prompts installation, full engineering governance, Vlad Ship, continuous agents, and Vlad-specific Tern workflows or visuals are not implemented. The inherited runtime does include configurable memory backends and learning tools; see the [integration assessment](../integrations/README.md). Do not present those inherited capabilities as a managed Vlad service.

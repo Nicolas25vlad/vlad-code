@@ -40,6 +40,7 @@
 
 ### Changed
 
+- The interactive welcome and collaboration screens now use Vlad Code's V mark and cyan-to-pink gradient.
 - A subagent spawned with a single step receives that step as written, without the `Complete assignment thoroughly:` and `# Step 1 of 1` framing
 - Shell command previews show chained commands with their real `&&`/`||` operators instead of `and`/`or`, and `cd dir` as written instead of a `cwd dir` badge
 - Asked to verify, optimize, or measure something, the agent keeps its checks to the code in question: that code's tests and its callers' instead of the whole suite, and a micro-benchmark or a scaled-down input instead of the full benchmark or the full slow case, which it runs once at the end
