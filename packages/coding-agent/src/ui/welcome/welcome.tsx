@@ -1,12 +1,11 @@
 /** @jsxImportSource @oh-my-pi/pi-tui */
 /**
- * The welcome card (`omp.welcome`): the lockup — the omp mark beside the
- * `omp` wordmark with the version (and any self-update activity) under it —
- * and the session's tip.
+ * The welcome card (`omp.welcome`) shows the Vlad Code mark, version, any
+ * update activity, and a tip.
  *
- * Terminal look (`src/ui/styles/welcome/welcome.ts`): the gradient logo and
- * half-block wordmark centered, the tip under it. The intro sweeps the
- * logo's gradient on the terminal clock for {@link INTRO_MS} from
+ * Terminal look (`src/ui/styles/welcome/welcome.ts`): the gradient V mark and
+ * wordmark form a centered lockup, with the tip below. The intro sweeps the
+ * mark's gradient on the terminal clock for {@link INTRO_MS} from
  * `introStart`; a native terminal animates its own builtin mark.
  */
 import { type Accessor, computed, type JSXNode, Show, type Signal, signal } from "@oh-my-pi/pi-tui";

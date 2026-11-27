@@ -130,6 +130,15 @@ jobs:
            id: detect
            shell: bash
            run: |
+              if [ "${{ github.repository }}" != "can1357/oh-my-pi" ]; then
+                echo "Fork builds do not run upstream release publishing."
+                {
+                  echo "is-release=false"
+                  echo "release-tag="
+                  echo "channel=stable"
+                } >> "$GITHUB_OUTPUT"
+                exit 0
+              fi
               is_release=false
               release_tag=""
               channel=stable
@@ -158,7 +167,7 @@ jobs:
 
    check:
       name: Lint, type check & web build
-      runs-on: ${{ github.event_name == 'pull_request' && 'ubuntu-22.04' || 'vmon-large/from=omp-ci' }}
+      runs-on: ${{ github.repository == 'can1357/oh-my-pi' && github.event_name != 'pull_request' && 'vmon-large/from=omp-ci' || 'ubuntu-22.04' }}
       steps:
          - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
          - uses: ./.github/actions/bun-install
@@ -240,7 +249,7 @@ jobs:
    # release. A skipped required check still satisfies branch protection.
    rust_validate:
       name: Validate Rust workspace (bazel)
-      if: github.event_name != 'pull_request'
+      if: github.repository == 'can1357/oh-my-pi' && github.event_name != 'pull_request'
       runs-on: vmon-large/from=omp-ci
       steps:
          - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
@@ -276,17 +285,16 @@ jobs:
 
    # Provides the linux-x64 addon pair every downstream TS job installs.
    #
-   # PRs never build. They restore the pair main built for the same native
-   # sources from actions/cache (key = hash of every native build input:
-   # toolchain and build settings plus crates/** and BUILD.bazel). With no
-   # exact entry (the PR changes native inputs, or main has not built this
-   # state yet) they take main's newest entry, and with no entry at all the
-   # latest npm release. The workspace loader skips its version sentinel for
-   # workspace loads, so any of these load under a newer checkout. Testing
-   # against main's build instead of the last release keeps merged-but-
-   # unreleased native fixes from failing every PR that did not touch Rust
-   # (a merged grep fix plus its TS test failed 75 PR runs against the
-   # 18.3.1 addon). Only main saves; see the save step for why.
+   # Upstream PRs restore the linux-x64 addon pair from main's cache (key =
+   # hash of every native build input). With no exact entry they use main's
+   # newest entry; if no cache exists they use the latest npm release. Forks
+   # build from this checkout when no exact cache entry exists, avoiding an
+   # npm addon whose API may lag the checked-out TypeScript. The workspace
+   # loader skips its version sentinel for workspace loads.
+   #
+   # Main builds only the pair here so the TS fan-out starts as soon as it
+   # links; native_addons_cross builds every other target in parallel.
+   # Only upstream main saves the shared cache.
    #
    # Main (vmon, node Bazel cache) builds only the pair here so the TS
    # fan-out starts as soon as it links; native_addons_cross builds every
@@ -294,7 +302,7 @@ jobs:
    # with required checks.
    native_addons:
       name: Build native addons (bazel)
-      runs-on: ${{ github.event_name == 'pull_request' && 'ubuntu-22.04' || 'vmon-large/from=omp-ci' }}
+      runs-on: ${{ github.repository == 'can1357/oh-my-pi' && github.event_name != 'pull_request' && 'vmon-large/from=omp-ci' || 'ubuntu-22.04' }}
       # actions: write lets main prune superseded addon cache entries.
       permissions:
          contents: read
@@ -311,13 +319,7 @@ jobs:
            run: |
               echo "prefix=natives-linux-x64-v1-" >> "$GITHUB_OUTPUT"
               echo "key=natives-linux-x64-v1-$NATIVE_INPUTS_HASH" >> "$GITHUB_OUTPUT"
-
-         # ---- PR path: main-built addons from actions/cache, else npm ----
-         # `ci-natives` is a plain workspace-relative path on purpose: the
-         # cache version hashes the literal path list, so vmon (save) and
-         # hosted (restore) must spell it identically, and upload-artifact
-         # skips dot-directories by default.
-         - name: Restore main-built native addons
+         - name: Restore native addon cache
            id: natives-cache
            if: github.event_name == 'pull_request'
            uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
@@ -326,8 +328,33 @@ jobs:
               key: ${{ steps.natives-key.outputs.key }}
               restore-keys: |
                  ${{ steps.natives-key.outputs.prefix }}
+
+         # ---- fork path: build native addons from this checkout ----
+         # An npm addon may lag the native API used by the checked-out TypeScript.
+         # Build source-matched artifacts in forks when no exact cache exists.
+         - id: fork-bazel-cache
+           if: github.repository != 'can1357/oh-my-pi' && steps.natives-cache.outputs.cache-hit != 'true'
+           uses: ./.github/actions/bazel-cache
+         - id: build-fork-native
+           name: Build fork native addons from checkout
+           if: github.repository != 'can1357/oh-my-pi' && steps.natives-cache.outputs.cache-hit != 'true'
+           shell: bash
+           env:
+              BAZELRC: ${{ steps.fork-bazel-cache.outputs.rc }}
+           run: |
+              set -eo pipefail
+              if [ "$(ulimit -Sn)" != unlimited ] && [ "$(ulimit -Sn)" -lt 65536 ]; then ulimit -Sn 65536 || true; fi
+              : > "$RUNNER_TEMP/bazel-build-fork.log"
+              for target in $NATIVES_X64_TARGETS; do
+                bazelisk --bazelrc="$BAZELRC" build "//:$target" 2>&1 | tee -a "$RUNNER_TEMP/bazel-build-fork.log"
+              done
+              for target in $NATIVES_X64_TARGETS; do
+                mkdir -p "ci-natives/$target"
+                cp -L bazel-bin/"$target"/*.node "ci-natives/$target/"
+              done
+         # The npm fallback is only for upstream PRs without any cache entry.
          - name: Fetch release native addons (npm)
-           if: github.event_name == 'pull_request' && steps.natives-cache.outputs.cache-matched-key == ''
+           if: github.repository == 'can1357/oh-my-pi' && github.event_name == 'pull_request' && steps.natives-cache.outputs.cache-matched-key == ''
            shell: bash
            run: |
               set -euo pipefail
@@ -337,29 +364,31 @@ jobs:
               mkdir -p ci-natives/natives-linux-x64-baseline ci-natives/natives-linux-x64-modern
               cp "$RUNNER_TEMP/package/pi_natives.linux-x64-baseline.node" ci-natives/natives-linux-x64-baseline/
               cp "$RUNNER_TEMP/package/pi_natives.linux-x64-modern.node" ci-natives/natives-linux-x64-modern/
-         # Make the addon source visible whenever it is not source-matched,
-         # instead of leaving a reviewer to wonder which addons the tests ran.
+         # Make the addon source visible whenever it is not source-matched.
          - name: Report native addon source
-           if: github.event_name == 'pull_request'
+           if: github.event_name == 'pull_request' || github.repository != 'can1357/oh-my-pi'
            shell: bash
            env:
               EXACT: ${{ steps.natives-cache.outputs.cache-hit }}
               MATCHED: ${{ steps.natives-cache.outputs.cache-matched-key }}
+              FORK_BUILD: ${{ steps.build-fork-native.outcome }}
            run: |
               if [ "$EXACT" = true ]; then
-                echo "Using main's addons for this exact native source state ($MATCHED)."
+                echo "Using cached addons for this exact native source state ($MATCHED)."
+              elif [ "$FORK_BUILD" = success ]; then
+                echo "Built native addons from this checkout with Bazel."
               elif [ -n "$MATCHED" ]; then
                 echo "::notice title=Native addons not source-matched::No main build matches this PR's native sources; testing against main's newest addon build ($MATCHED). Native changes are validated post-merge on main and at release."
               else
-                echo "::notice title=Native addons from npm::No main-built addon cache entry is available; testing against the latest npm release addons."
+                echo "::notice title=Native addons from npm::Testing against the latest npm release addons."
               fi
 
          # ---- main path: bazel build of the linux-x64 pair ----
          - id: cache
-           if: github.event_name != 'pull_request'
+           if: github.event_name != 'pull_request' && github.repository == 'can1357/oh-my-pi'
            uses: ./.github/actions/bazel-cache
          - name: Build linux-x64 native addons
-           if: github.event_name != 'pull_request'
+           if: github.event_name != 'pull_request' && github.repository == 'can1357/oh-my-pi'
            run: |
               set -eo pipefail
               if [ "$(ulimit -Sn)" != unlimited ] && [ "$(ulimit -Sn)" -lt 65536 ]; then ulimit -Sn 65536 || true; fi
@@ -382,7 +411,7 @@ jobs:
          # thousands of actions is the failure mode that made CI slow — make
          # it visible in the run summary instead of discovering it weeks in.
          - name: Report bazel cache stats
-           if: github.event_name != 'pull_request'
+           if: github.event_name != 'pull_request' && github.repository == 'can1357/oh-my-pi'
            shell: bash
            run: |
               # Bazel runs with --color=yes (config=ci); strip ANSI before
@@ -430,13 +459,13 @@ jobs:
          # looks it up and the probe and save below talk to GitHub.
          - name: Locate GitHub's cache service
            id: gh-results
-           if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+           if: github.repository == 'can1357/oh-my-pi' && github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
            uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
            with:
               script: core.setOutput("url", process.env.ACTIONS_RESULTS_ORL || process.env.ACTIONS_RESULTS_URL)
          - name: Probe native addon cache entry
            id: natives-cache-probe
-           if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+           if: github.repository == 'can1357/oh-my-pi' && github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
            continue-on-error: true
            uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
            env:
@@ -446,7 +475,7 @@ jobs:
               key: ${{ steps.natives-key.outputs.key }}
               lookup-only: true
          - name: Save native addon cache entry
-           if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && steps.natives-cache-probe.outputs.cache-hit != 'true'
+           if: github.repository == 'can1357/oh-my-pi' && github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && steps.natives-cache-probe.outputs.cache-hit != 'true'
            continue-on-error: true
            uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
            env:
@@ -455,7 +484,7 @@ jobs:
               path: ci-natives
               key: ${{ steps.natives-key.outputs.key }}
          - name: Prune superseded native addon cache entries
-           if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && steps.natives-cache-probe.outputs.cache-hit != 'true'
+           if: github.repository == 'can1357/oh-my-pi' && github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && steps.natives-cache-probe.outputs.cache-hit != 'true'
            continue-on-error: true
            shell: bash
            env:
@@ -484,7 +513,7 @@ jobs:
    # the build also keeps the remote cache warm for release runs.
    native_addons_cross:
       name: Build native addons (bazel, cross targets)
-      if: github.event_name != 'pull_request'
+      if: github.repository == 'can1357/oh-my-pi' && github.event_name != 'pull_request'
       runs-on: vmon-large/from=omp-ci
       steps:
          - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
@@ -550,7 +579,7 @@ jobs:
 
    test_coding_agent_native:
       name: "Test coding-agent native/unit (TS) ${{ matrix.shard }}"
-      runs-on: ${{ github.event_name == 'pull_request' && 'ubuntu-22.04' || 'vmon-large/from=omp-ci' }}
+      runs-on: ${{ github.repository == 'can1357/oh-my-pi' && github.event_name != 'pull_request' && 'vmon-large/from=omp-ci' || 'ubuntu-22.04' }}
       needs: [native_addons]
       if: ${{ !cancelled() && needs.native_addons.result == 'success' }}
       timeout-minutes: 25
@@ -581,7 +610,7 @@ jobs:
 
    test_workspace:
       name: Test TS workspace fast
-      runs-on: ${{ github.event_name == 'pull_request' && 'ubuntu-22.04' || 'vmon-large/from=omp-ci' }}
+      runs-on: ${{ github.repository == 'can1357/oh-my-pi' && github.event_name != 'pull_request' && 'vmon-large/from=omp-ci' || 'ubuntu-22.04' }}
       needs: [native_addons]
       if: ${{ !cancelled() && needs.native_addons.result == 'success' }}
       timeout-minutes: 20
@@ -598,7 +627,7 @@ jobs:
 
    test_coding_agent_singleton:
       name: Test coding-agent singleton/global-state (TS)
-      runs-on: ${{ github.event_name == 'pull_request' && 'ubuntu-22.04' || 'vmon-large/from=omp-ci' }}
+      runs-on: ${{ github.repository == 'can1357/oh-my-pi' && github.event_name != 'pull_request' && 'vmon-large/from=omp-ci' || 'ubuntu-22.04' }}
       needs: [native_addons]
       if: ${{ !cancelled() && needs.native_addons.result == 'success' }}
       timeout-minutes: 20
@@ -615,7 +644,7 @@ jobs:
 
    test_ts_native:
       name: Test TS native/integration packages
-      runs-on: ${{ github.event_name == 'pull_request' && 'ubuntu-22.04' || 'vmon-large/from=omp-ci' }}
+      runs-on: ${{ github.repository == 'can1357/oh-my-pi' && github.event_name != 'pull_request' && 'vmon-large/from=omp-ci' || 'ubuntu-22.04' }}
       needs: [native_addons]
       if: ${{ !cancelled() && needs.native_addons.result == 'success' }}
       timeout-minutes: 25
@@ -634,7 +663,7 @@ jobs:
 
    test_coding_agent_ui:
       name: Test coding-agent UI/TUI (TS)
-      runs-on: ${{ github.event_name == 'pull_request' && 'ubuntu-22.04' || 'vmon-large/from=omp-ci' }}
+      runs-on: ${{ github.repository == 'can1357/oh-my-pi' && github.event_name != 'pull_request' && 'vmon-large/from=omp-ci' || 'ubuntu-22.04' }}
       needs: [native_addons]
       if: ${{ !cancelled() && needs.native_addons.result == 'success' }}
       timeout-minutes: 25
@@ -651,7 +680,7 @@ jobs:
 
    test_coding_agent_runtime:
       name: Test coding-agent runtime/session (TS)
-      runs-on: ${{ github.event_name == 'pull_request' && 'ubuntu-22.04' || 'vmon-large/from=omp-ci' }}
+      runs-on: ${{ github.repository == 'can1357/oh-my-pi' && github.event_name != 'pull_request' && 'vmon-large/from=omp-ci' || 'ubuntu-22.04' }}
       needs: [native_addons]
       if: ${{ !cancelled() && needs.native_addons.result == 'success' }}
       timeout-minutes: 25
@@ -670,7 +699,7 @@ jobs:
 
    test_smoke:
       name: Test CLI smoke (TS)
-      runs-on: ${{ github.event_name == 'pull_request' && 'ubuntu-22.04' || 'vmon-large/from=omp-ci' }}
+      runs-on: ${{ github.repository == 'can1357/oh-my-pi' && github.event_name != 'pull_request' && 'vmon-large/from=omp-ci' || 'ubuntu-22.04' }}
       needs: [native_addons]
       if: ${{ !cancelled() && needs.native_addons.result == 'success' }}
       timeout-minutes: 15
@@ -685,7 +714,7 @@ jobs:
 
    install_methods:
       name: Install method smoke tests
-      runs-on: ${{ github.event_name == 'pull_request' && 'ubuntu-22.04' || 'vmon-large/from=omp-ci' }}
+      runs-on: ${{ github.repository == 'can1357/oh-my-pi' && github.event_name != 'pull_request' && 'vmon-large/from=omp-ci' || 'ubuntu-22.04' }}
       needs: [native_addons]
       if: ${{ !cancelled() && needs.native_addons.result == 'success' }}
       steps:

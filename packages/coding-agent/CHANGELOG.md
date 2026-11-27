@@ -15,6 +15,7 @@
 
 ### Added
 
+- Added `omp spec new <slug> [--title <title>]` to create a structured engineering specification under `.vlad/specs/`.
 - `prewalk.auto: escalate` plans a front-loaded task on `prewalk.from` before handing off, and returns to the starting model at the next task; `prewalk.autoTarget: "@initial"` hands back to the model and thinking level the task started on. `suggest` reports the planner `escalate` would move to ([#16243](https://github.com/can1357/oh-my-pi/pull/16243) by [@taibenvenuti](https://github.com/taibenvenuti))
 - The subagents HUD mutes the status mark, and tray cards mark, subagents that are only waiting on their own agents or jobs (`wait`, `vibe_wait`), so they stand apart from subagents doing work
 - Retry fallbacks now record why they switched models on the fallback's `model_change` entry: the model left, the trigger (`request-error`, `agent-loop`, `usage-preflight`, or `missing-credential`), and the error or condition. A fallback after the agent loop stopped a turn itself, such as a soft tool requirement the model never met, is announced as `Turn stopped: …` instead of `Request failed: …` ([#20336](https://github.com/can1357/oh-my-pi/pull/20336) by [@baekjosh](https://github.com/baekjosh))
@@ -39,6 +40,7 @@
 
 ### Changed
 
+- The interactive welcome and collaboration screens now use Vlad Code's V mark and cyan-to-pink gradient.
 - A subagent spawned with a single step receives that step as written, without the `Complete assignment thoroughly:` and `# Step 1 of 1` framing
 - Shell command previews show chained commands with their real `&&`/`||` operators instead of `and`/`or`, and `cd dir` as written instead of a `cwd dir` badge
 - Asked to verify, optimize, or measure something, the agent keeps its checks to the code in question: that code's tests and its callers' instead of the whole suite, and a micro-benchmark or a scaled-down input instead of the full benchmark or the full slow case, which it runs once at the end

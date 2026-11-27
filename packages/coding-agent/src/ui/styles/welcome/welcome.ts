@@ -2,9 +2,8 @@
  * Terminal look of the welcome card (`omp.welcome`, `src/ui/welcome/welcome.tsx`).
  *
  * Content keeps a column clear on each side and centers in the full width:
- * - the gradient logo with the bold `omp` wordmark beside it and the dim
- *   version under the wordmark — the logo alone when the lockup does not fit,
- *   nothing below four columns; centered as one block;
+ * - the Vlad Code V mark and wordmark beside the dim version, or just the mark
+ *   when the lockup does not fit — nothing below four columns; centered as one block;
  * - after the version, the widest form of any self-update activity that
  *   still fits (bar and percent, then just the percent);
  * - from 50 columns, a blank row and the tip, `Tip:` in the label color and

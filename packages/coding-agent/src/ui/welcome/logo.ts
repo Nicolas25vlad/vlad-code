@@ -1,31 +1,36 @@
 /**
- * The omp brand mark for terminals: a block-grid logo painted with a diagonal
- * pink → violet → cyan gradient, the half-block `omp` wordmark, and the
+ * Vlad Code's terminal mark: an angular V, a compact wordmark, and the
  * intro animation (the gradient sweeping round while a highlight crosses it).
  */
 import type { ColorDepth } from "@oh-my-pi/pi-tui/theme/color";
 
-/** The block-grid logo. */
-export const LOGO: readonly string[] = ["████████████", "   ██  ██   ", "   ██  ██   ", "   ▒▒  ██   ", "       ██   "];
+/** A compact V mark that fits the welcome card's narrow-terminal layout. */
+export const LOGO: readonly string[] = [
+	"  ██      ██  ",
+	"   ██    ██   ",
+	"    ██  ██    ",
+	"     ████     ",
+	"      ██      ",
+];
 
 /** Columns of {@link LOGO}. */
-export const LOGO_WIDTH = 12;
+export const LOGO_WIDTH = 14;
 
-/** The `omp` wordmark in half-blocks, set beside the logo from its second row (the `p` descends a row). */
-export const WORDMARK: readonly string[] = ["▄▀▀▄ █▀▄▀▄ █▀▀▄", "▀▄▄▀ █ █ █ █▄▄▀", "           █"];
+/** Vlad Code wordmark alongside the mark. */
+export const WORDMARK: readonly string[] = ["V L A D   C O D E"];
 
 /** Columns of {@link WORDMARK}. */
-export const WORDMARK_WIDTH = 15;
+export const WORDMARK_WIDTH = 17;
 
 /** Gradient stops along the diagonal (truecolor). */
 const STOPS: readonly (readonly [number, number, number])[] = [
-	[248, 79, 204],
-	[147, 98, 244],
 	[0, 219, 228],
+	[37, 139, 255],
+	[236, 117, 212],
 ];
 
 /** The gradient on the 256-color palette. */
-const RAMP_256 = [206, 170, 134, 99, 69, 74, 44];
+const RAMP_256 = [44, 45, 39, 75, 111, 147, 219];
 
 /** Half-width of the highlight band along the diagonal. */
 const SHINE_HALF_WIDTH = 0.18;
