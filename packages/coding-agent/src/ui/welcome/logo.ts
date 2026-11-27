@@ -5,7 +5,13 @@
 import type { ColorDepth } from "@oh-my-pi/pi-tui/theme/color";
 
 /** A compact V mark that fits the welcome card's narrow-terminal layout. */
-export const LOGO: readonly string[] = ["  ██      ██  ", "   ██    ██   ", "    ██  ██    ", "     ████     ", "      ██      "];
+export const LOGO: readonly string[] = [
+	"  ██      ██  ",
+	"   ██    ██   ",
+	"    ██  ██    ",
+	"     ████     ",
+	"      ██      ",
+];
 
 /** Columns of {@link LOGO}. */
 export const LOGO_WIDTH = 14;
